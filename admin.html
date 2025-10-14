@@ -3,192 +3,46 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stats — Cost of a Like</title>
+  <title>Admin — Cost of a Like</title>
   <style>
     body { margin:0; background:#0f0f12; color:#eaeaea; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
     .wrap { min-height:100vh; display:grid; place-items:center; padding:2rem; }
     .card {
-      width:min(680px, 92vw);
+      width:min(400px, 90vw);
       background:#17171b;
       border:1px solid #2a2a2f;
       border-radius:18px;
       padding:1.5rem;
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      text-align:center;
     }
     h1 { margin:0 0 .75rem; font-size:1.4rem; }
-    .row { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
-    input[type="password"] { flex:1; background:#0f0f12; color:#eaeaea; border:1px solid #2a2a2f; border-radius:10px; padding:.75rem 1rem; }
-    button {
-      background:#2ecc71; border:none; color:#0a0a0a; padding:.75rem 1rem; border-radius:10px; font-weight:700; cursor:pointer;
-    }
-    button.danger { background:#ff6b6b; color:#0a0a0a; }
-    .stats { margin-top:1rem; font-size:1.1rem; }
-    .muted { opacity:.7; font-size:.95rem; }
-    .leaderboard { margin-top: 1.5rem; text-align: left; }
-    .leaderboard h2 { font-size: 1.2rem; margin-bottom: 0.5rem; opacity: 0.85; }
-    .leaderboard ol { list-style: none; padding: 0; margin: 0; }
-    .leaderboard li {
-      padding: 0.4rem 0.6rem;
-      margin-bottom: 0.25rem;
-      border-radius: 8px;
-      background: #1c1c21;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      opacity: 0;
-      transform: translateX(-20px);
-      animation: slideIn 0.4s forwards;
-    }
-    .leaderboard li span.name { flex: 1; }
-    .leaderboard li span.likes { opacity: 0.8; }
-    @keyframes slideIn {
-      to { opacity: 1; transform: translateX(0); }
-    }
-    .leaderboard li.gold {
-      background: linear-gradient(90deg, #ffd70033, #ffd70011);
-      color: #ffd700;
-      font-weight: 600;
-    }
-    .leaderboard li.silver {
-      background: linear-gradient(90deg, #c0c0c033, #c0c0c011);
-      color: #c0c0c0;
-      font-weight: 500;
-    }
-    .leaderboard li.bronze {
-      background: linear-gradient(90deg, #cd7f3233, #cd7f3211);
-      color: #cd7f32;
-      font-weight: 500;
-    }
-    .crown { font-size: 1.2rem; }
+    input[type="password"] { width:100%; background:#0f0f12; color:#eaeaea; border:1px solid #2a2a2f; border-radius:10px; padding:.75rem 1rem; margin-bottom:1rem; }
+    button { background:#ff6b6b; border:none; color:#0a0a0a; padding:.75rem 1rem; border-radius:10px; font-weight:700; cursor:pointer; width:100%; }
   </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <h1>Admin Stats</h1>
-    <div class="row">
+  <div class="wrap">
+    <div class="card">
+      <h1>Admin Control</h1>
       <input id="pw" type="password" placeholder="Admin password" />
-      <button id="refreshBtn">Refresh</button>
-      <button id="resetBtn" class="danger" title="Optional: reset count to 0">Reset</button>
+      <button id="resetBtn">Reset Like Count</button>
     </div>
-    <div class="stats">
-      Total likes: <strong id="count">—</strong>
-    </div>
-    <div class="leaderboard">
-      <h2>🏆 Top Likers</h2>
-      <ol id="leaderList"></ol>
-    </div>
-    <p class="muted">This page is protected by a shared password and checked server-side. Keep it private for your talk.</p>
   </div>
-</div>
-<script>
-  let lastTopUser = null;
+  <script>
+    const pw = document.getElementById('pw');
+    const resetBtn = document.getElementById('resetBtn');
 
-  function launchConfetti() {
-    const duration = 1500;
-    const end = Date.now() + duration;
-    const colors = ['#ffd700', '#ff6b6b', '#4caf50', '#2196f3', '#ff9800'];
-
-    (function frame() {
-      for (let i = 0; i < 10; i++) {
-        const confetti = document.createElement('div');
-        confetti.style.position = 'fixed';
-        confetti.style.zIndex = '9999';
-        confetti.style.width = '8px';
-        confetti.style.height = '8px';
-        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-        confetti.style.top = '0';
-        confetti.style.left = (Math.random() * 100) + 'vw';
-        confetti.style.opacity = '0.9';
-        confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
-        document.body.appendChild(confetti);
-
-        const fall = (Math.random() * 100) + 200;
-        const drift = (Math.random() - 0.5) * 200;
-
-        confetti.animate([
-          { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
-          { transform: `translate(${drift}px, ${fall}px) rotate(720deg)`, opacity: 0 }
-        ], { duration: 1500 + Math.random() * 1000, easing: 'ease-out' });
-
-        setTimeout(() => confetti.remove(), 1800);
-      }
-      if (Date.now() < end) requestAnimationFrame(frame);
-    })();
-  }
-
-  const pw = document.getElementById('pw');
-  const countEl = document.getElementById('count');
-  const refreshBtn = document.getElementById('refreshBtn');
-  const resetBtn = document.getElementById('resetBtn');
-
-  async function getCount() {
-    const res = await fetch('/api/get', { headers: { 'x-admin-key': pw.value }});
-    const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Unauthorized'); return; }
-    countEl.textContent = data.count ?? 0;
-  }
-
-  async function resetCount() {
-    if (!confirm('Reset like count to 0?')) return;
-    const res = await fetch('/api/reset', { method:'POST', headers: { 'x-admin-key': pw.value }});
-    const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Unauthorized'); return; }
-    countEl.textContent = data.count ?? 0;
-  }
-
-  async function getLeaderboard() {
-    const res = await fetch('/api/leaderboard', { headers: { 'x-admin-key': pw.value } });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Unauthorized'); return; }
-
-    const list = document.getElementById('leaderList');
-    list.innerHTML = '';
-
-    if (data.leaderboard.length > 0) {
-      const topUser = data.leaderboard[0].name;
-      if (topUser !== lastTopUser) {
-        launchConfetti();
-        lastTopUser = topUser;
-      }
+    async function resetCount() {
+      if (!confirm('Reset like count to 0?')) return;
+      const res = await fetch('/api/reset', { method:'POST', headers: { 'x-admin-key': pw.value }});
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Unauthorized'); return; }
+      alert('✅ Like count has been reset');
     }
 
-    data.leaderboard.forEach((item, index) => {
-      const li = document.createElement('li');
-      const rank = index + 1;
-
-      if (rank === 1) li.classList.add('gold');
-      if (rank === 2) li.classList.add('silver');
-      if (rank === 3) li.classList.add('bronze');
-
-      const crown = document.createElement('span');
-      crown.className = 'crown';
-      crown.textContent =
-        rank === 1 ? '👑' :
-        rank === 2 ? '🥈' :
-        rank === 3 ? '🥉' : `${rank}.`;
-
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'name';
-      nameSpan.textContent = item.name;
-
-      const likesSpan = document.createElement('span');
-      likesSpan.className = 'likes';
-      likesSpan.textContent = `❤️ ${item.likes}`;
-
-      li.appendChild(crown);
-      li.appendChild(nameSpan);
-      li.appendChild(likesSpan);
-      list.appendChild(li);
-    });
-  }
-
-  refreshBtn.addEventListener('click', () => {
-    getCount();
-    getLeaderboard();
-  });
-  resetBtn.addEventListener('click', resetCount);
-  pw.focus();
-</script>
+    resetBtn.addEventListener('click', resetCount);
+    pw.focus();
+  </script>
 </body>
 </html>
