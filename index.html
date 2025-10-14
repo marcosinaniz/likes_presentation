@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cost of a Like — Demo</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #0f0f12;
+      color: #eaeaea;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    .wrap {
+      height: 100%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      gap: 1rem;
+      padding: 2rem;
+    }
+    h1 { font-weight: 700; margin: 0; font-size: clamp(1.3rem, 2.5vw, 1.8rem); opacity: .9; }
+    .heart-btn {
+      width: clamp(160px, 30vmin, 260px);
+      height: clamp(160px, 30vmin, 260px);
+      border-radius: 999px;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      background: radial-gradient(circle at 30% 30%, #ff6b6b, #d90429);
+      box-shadow: 0 10px 30px rgba(217,4,41,.35), inset 0 0 40px rgba(255,255,255,.15);
+      position: relative;
+      transition: transform .08s ease;
+    }
+    .heart-btn:active { transform: scale(.98); }
+    .heart {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 45%;
+      aspect-ratio: 1 / 1;
+      transform: translate(-50%, -50%) rotate(45deg);
+      background: #fff;
+      -webkit-mask:
+        radial-gradient(50% 50% at 25% 25%,#000 98%,#0000) top left,
+        radial-gradient(50% 50% at 75% 25%,#000 98%,#0000) top right,
+        linear-gradient(#000 0 0) bottom center / 100% 58% no-repeat;
+      mask:
+        radial-gradient(50% 50% at 25% 25%,#000 98%,#0000) top left,
+        radial-gradient(50% 50% at 75% 25%,#000 98%,#0000) top right,
+        linear-gradient(#000 0 0) bottom center / 100% 58% no-repeat;
+      background: #ffccd5;
+      filter: drop-shadow(0 6px 12px rgba(0,0,0,.25));
+    }
+    .counter {
+      font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+      opacity: .8;
+    }
+    /* floating like particles */
+    .particle {
+      position: fixed;
+      font-size: 18px;
+      pointer-events: none;
+      animation: floatUp 900ms ease forwards;
+      opacity: .9;
+      text-shadow: 0 2px 8px rgba(0,0,0,.45);
+    }
+    @keyframes floatUp {
+      from { transform: translateY(0) scale(1); opacity: 1; }
+      to   { transform: translateY(-120px) scale(1.4); opacity: 0; }
+    }
+
+    .footer {
+      position: fixed;
+      bottom: 10px;
+      width: 100%;
+      text-align: center;
+      font-size: .9rem;
+      opacity: .6;
+    }
+    a { color: #9be1ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Tap the heart. Watch the number climb.</h1>
+    <button id="heartBtn" class="heart-btn" aria-label="Like">
+      <div class="heart" aria-hidden="true"></div>
+    </button>
+    <div class="counter" id="countLabel">Likes counted: <strong id="count">—</strong></div>
+  </div>
+  <div class="footer">
+    Stats (admin): <a href="./admin.html">/admin</a>
+  </div>
+
+  <script>
+    const btn = document.getElementById('heartBtn');
+    const countEl = document.getElementById('count');
+
+    // Optimistically show count after increment response
+    async function refreshCount() {
+      try {
+        const res = await fetch('/api/get-public');
+        const data = await res.json();
+        countEl.textContent = data.count ?? 0;
+      } catch (e) {
+        countEl.textContent = '…';
+      }
+    }
+
+    function spawnParticle(x, y) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = x + 'px';
+      p.style.top = y + 'px';
+      const emojis = ['❤','💖','💗','💓','✨','💞','💘'];
+      p.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+      document.body.appendChild(p);
+      setTimeout(()=>p.remove(), 900);
+    }
+
+    btn.addEventListener('click', async (e) => {
+      // fun local particles burst
+      for (let i=0;i<6;i++) {
+        const jitterX = (Math.random() - 0.5) * 120;
+        const jitterY = (Math.random() - 0.5) * 40;
+        const rect = btn.getBoundingClientRect();
+        spawnParticle(rect.left + rect.width/2 + jitterX, rect.top + rect.height/2 + jitterY);
+      }
+      try {
+        const res = await fetch('/api/increment', { method: 'POST' });
+        const data = await res.json();
+        if (typeof data.count === 'number') {
+          countEl.textContent = data.count;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    // initial
+    refreshCount();
+  </script>
+</body>
+</html>
