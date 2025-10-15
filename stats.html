@@ -6,72 +6,25 @@
   <title>Stats — Cost of a Like</title>
   <style>
     body { margin:0; background:#0f0f12; color:#eaeaea; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
-    .wrap {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    box-sizing: border-box;
-    }
-
-    .card {
-    width: 100%;
-    max-width: 800px;
-    background: #17171b;
-    border: 1px solid #2a2a2f;
-    border-radius: 18px;
-    padding: 1.5rem;
-    box-shadow: 0 10px 30px rgba(0,0,0,.35);
-    text-align: center;
-    }
+    .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1rem; box-sizing:border-box; }
+    .card { width:100%; max-width: 980px; background:#17171b; border:1px solid #2a2a2f; border-radius:18px; padding:1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,.35); text-align:center; }
     h1 { margin:0; font-size:2rem; margin-bottom:1rem; opacity:0.85; }
-    .big-counter {
-      font-size: clamp(3rem, 10vw, 6rem);
-      font-weight: 800;
-      margin: 0.5rem 0 1rem 0;
-      color: #ff6b6b;
-      text-shadow: 0 0 20px rgba(255,107,107,0.5);
-      transition: transform 0.2s ease, text-shadow 0.2s ease;
-    }
-    .big-counter.bump {
-      transform: scale(1.15);
-      text-shadow: 0 0 35px rgba(255,107,107,0.8);
-    }
+    .big-counter { font-size: clamp(3rem, 10vw, 6rem); font-weight: 800; margin: 0.5rem 0 1rem 0; color: #ff6b6b; text-shadow: 0 0 20px rgba(255,107,107,0.5); transition: transform 0.2s ease, text-shadow 0.2s ease; }
+    .big-counter.bump { transform: scale(1.15); text-shadow: 0 0 35px rgba(255,107,107,0.8); }
     .leaderboard { margin-top: 1rem; text-align: left; }
     .leaderboard h2 { font-size: 1.2rem; margin-bottom: 0.5rem; opacity: 0.85; }
     .leaderboard ol { list-style: none; padding: 0; margin: 0; }
-    .leaderboard li {
-      padding: 0.4rem 0.6rem;
-      margin-bottom: 0.25rem;
-      border-radius: 8px;
-      background: #1c1c21;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      opacity: 0;
-      transform: translateX(-20px);
-      animation: slideIn 0.4s forwards;
-    }
+    .leaderboard li { padding: 0.4rem 0.6rem; margin-bottom: 0.25rem; border-radius: 8px; background: #1c1c21; display: flex; align-items: center; gap: 0.5rem; opacity: 0; transform: translateX(-20px); animation: slideIn 0.4s forwards; }
     .leaderboard li span.name { flex: 1; }
     .leaderboard li span.likes { opacity: 0.8; }
     @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
-    .leaderboard li.gold {
-      background: linear-gradient(90deg, #ffd70033, #ffd70011);
-      color: #ffd700;
-      font-weight: 600;
-    }
-    .leaderboard li.silver {
-      background: linear-gradient(90deg, #c0c0c033, #c0c0c011);
-      color: #c0c0c0;
-      font-weight: 500;
-    }
-    .leaderboard li.bronze {
-      background: linear-gradient(90deg, #cd7f3233, #cd7f3211);
-      color: #cd7f32;
-      font-weight: 500;
-    }
+    .leaderboard li.gold { background: linear-gradient(90deg, #ffd70033, #ffd70011); color: #ffd700; font-weight: 600; }
+    .leaderboard li.silver { background: linear-gradient(90deg, #c0c0c033, #c0c0c011); color: #c0c0c0; font-weight: 500; }
+    .leaderboard li.bronze { background: linear-gradient(90deg, #cd7f3233, #cd7f3211); color: #cd7f32; font-weight: 500; }
     .crown { font-size: 1.2rem; }
+    .chart-wrap { margin-top: 1rem; background:#141418; border:1px solid #2a2a2f; border-radius:14px; padding: .75rem; }
+    canvas { width: 100%; height: 260px; }
+    @media (max-width: 480px) { h1 { font-size: 1.5rem; } .big-counter { font-size: 3rem; } canvas { height: 200px; } }
   </style>
 </head>
 <body>
@@ -79,15 +32,20 @@
     <div class="card">
       <h1>📊 Total Likes</h1>
       <div id="count" class="big-counter">—</div>
+      <div class="chart-wrap">
+        <canvas id="likesChart" aria-label="Likes over time" role="img"></canvas>
+      </div>
       <div class="leaderboard">
         <h2>🏆 Top Likers</h2>
         <ol id="leaderList"></ol>
       </div>
     </div>
   </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
   let lastTopUser = null;
   let lastCount = null;
+  let chart;
 
   function launchConfetti() {
     const duration = 1500;
@@ -180,9 +138,58 @@
     });
   }
 
+  async function getSeries() {
+    const res = await fetch('/api/likes-timeseries');
+    const data = await res.json();
+    const labels = data.points.map(p => new Date(p.t));
+    const values = data.points.map(p => p.count);
+
+    if (!chart) {
+      const ctx = document.getElementById('likesChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Likes per 10s (UTC)',
+            data: values,
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              type: 'time',
+              time: { unit: 'second', displayFormats: { second: 'HH:mm:ss' } },
+              ticks: { color: '#cfcfcf', maxRotation: 0, autoSkip: true },
+              grid: { color: 'rgba(255,255,255,0.06)' }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#cfcfcf' },
+              grid: { color: 'rgba(255,255,255,0.06)' }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#eaeaea' } },
+            tooltip: { intersect: false, mode: 'index' }
+          }
+        }
+      });
+    } else {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = values;
+      chart.update('none');
+    }
+  }
+
   async function refreshAll() {
     await getCount();
     await getLeaderboard();
+    await getSeries();
   }
 
   refreshAll();
