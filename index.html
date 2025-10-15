@@ -34,7 +34,9 @@
       transition: transform .08s ease;
     }
     .heart-btn:disabled { opacity: .4; cursor: not-allowed; }
-    .heart-btn:active { transform: scale(.98); }
+    .heart-btn:active .heart {
+      transform: translate(-50%, -50%) scale(0.9);
+    }
     .heart {
       position: absolute;
       left: 50%;
