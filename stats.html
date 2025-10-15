@@ -10,6 +10,15 @@
     .card { width:100%; max-width: 980px; background:#17171b; border:1px solid #2a2a2f; border-radius:18px; padding:1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,.35); text-align:center; }
     h1 { margin:0; font-size:2rem; margin-bottom:1rem; opacity:0.85; }
     .big-counter { font-size: clamp(3rem, 10vw, 6rem); font-weight: 800; margin: 0.5rem 0 1rem 0; color: #ff6b6b; text-shadow: 0 0 20px rgba(255,107,107,0.5); transition: transform 0.2s ease, text-shadow 0.2s ease; }
+    .big-counter.is-money {
+      color: #2ecc71;            /* green */
+      text-shadow: 0 0 20px rgba(46, 204, 113, 0.5);
+    }
+    
+    .big-counter.is-time {
+      color: #ffd54f;            /* yellow */
+      text-shadow: 0 0 20px rgba(255, 213, 79, 0.5);
+    }
     .big-counter.bump { transform: scale(1.15); text-shadow: 0 0 35px rgba(255,107,107,0.8); }
     .leaderboard { margin-top: 1rem; text-align: left; }
     .leaderboard h2 { font-size: 1.2rem; margin-bottom: 0.5rem; opacity: 0.85; }
@@ -30,7 +39,7 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>📊 Total Likes</h1>
+      <h1 id="statsTitle">📊 Total Likes</h1>
       <div id="count" class="big-counter">—</div>
       <div class="chart-wrap">
         <canvas id="likesChart" aria-label="Likes over time" role="img"></canvas>
@@ -47,6 +56,60 @@
   let lastTopUser = null;
   let lastCount = null;
   let chart;
+
+  // === NEW: display state + refs ===
+  let displayMode = 'likes';      // 'likes' | 'money' | 'time'
+  let lastRawLikes = 0;           // numeric likes from /api/get-public
+  
+  const titleEl = document.getElementById('statsTitle');
+  const countEl = document.getElementById('count');
+  
+  function formatMoneyEUR(value) {
+    return new Intl.NumberFormat('en-IE', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 2
+    }).format(value);
+  }
+  
+  function renderDisplay() {
+    // clear color classes
+    countEl.classList.remove('is-money', 'is-time');
+  
+    if (displayMode === 'likes') {
+      titleEl.textContent = '📊 Total Likes';
+      countEl.textContent = String(lastRawLikes);
+      // default big-counter color stays as-is
+    } else if (displayMode === 'money') {
+      titleEl.textContent = '💶 Money Earned';
+      const euros = lastRawLikes * 0.01;
+      countEl.textContent = formatMoneyEUR(euros);
+      countEl.classList.add('is-money');
+    } else if (displayMode === 'time') {
+      titleEl.textContent = '⏳ Time Cost';
+      const seconds = lastRawLikes * 0.5;
+      const s = Math.round(seconds * 10) / 10; // one decimal
+      countEl.textContent = `${s} s`;
+      countEl.classList.add('is-time');
+    }
+  }
+  
+  // interactions: click number → Money; click title → Time
+  countEl.addEventListener('click', () => {
+    displayMode = 'money';
+    renderDisplay();
+  });
+  
+  titleEl.addEventListener('click', () => {
+    displayMode = 'time';
+    renderDisplay();
+  });
+  
+  // Optional: double-click number → back to Likes
+  countEl.addEventListener('dblclick', () => {
+    displayMode = 'likes';
+    renderDisplay();
+  });
 
   function launchConfetti() {
     const duration = 1500;
@@ -83,16 +146,20 @@
   async function getCount() {
     const res = await fetch('/api/get-public');
     const data = await res.json();
-    const countEl = document.getElementById('count');
     const newCount = data.count ?? 0;
-
+  
+    // keep your bump animation behavior
     if (lastCount !== null && newCount !== lastCount) {
       countEl.classList.add('bump');
       setTimeout(() => countEl.classList.remove('bump'), 250);
     }
-
-    countEl.textContent = newCount;
+  
+    // store raw likes for the display modes
+    lastRawLikes = newCount;
     lastCount = newCount;
+  
+    // render according to current mode (likes/money/time)
+    renderDisplay();
   }
 
   async function getLeaderboard() {
