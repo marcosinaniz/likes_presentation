@@ -12,14 +12,31 @@ export default async function handler(req, res) {
 
   const cleanName = name.trim().substring(0, 50);
 
+  // increment total
   await fetch(`${url}/incr/like_count`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 
-  const r = await fetch(`${url}/zincrby/user_likes/1/${encodeURIComponent(cleanName)}`, {
+  // increment per user
+  const userInc = await fetch(`${url}/zincrby/user_likes/1/${encodeURIComponent(cleanName)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  const out = await r.json();
+  const userOut = await userInc.json();
 
-  return res.status(200).json({ count: out.result ?? 0 });
+  // round down to nearest 10 seconds (UTC)
+  const now = new Date();
+  const rounded = new Date(Math.floor(now.getTime() / 10000) * 10000);
+  const y = rounded.getUTCFullYear();
+  const m = String(rounded.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(rounded.getUTCDate()).padStart(2, '0');
+  const hh = String(rounded.getUTCHours()).padStart(2, '0');
+  const mm = String(rounded.getUTCMinutes()).padStart(2, '0');
+  const ss = String(rounded.getUTCSeconds()).padStart(2, '0');
+  const bucket = `${y}${m}${d}${hh}${mm}${ss}`;
+
+  await fetch(`${url}/hincrby/likes_timeseries/${bucket}/1`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  return res.status(200).json({ count: userOut.result ?? 0 });
 }
